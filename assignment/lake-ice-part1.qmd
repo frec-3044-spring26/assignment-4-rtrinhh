@@ -1,6 +1,6 @@
 ---
 title: "Lake Ice Phenology: Part 1"
-author: 'YOUR NAME'
+author: 'Rebecca Trinh'
 format:
   html:
     embed-resources: true
@@ -26,12 +26,16 @@ Now use `read_excel()` to read in `file_name`. Remember that Excel files can hav
 
 ```{r}
 library(readxl)
-
+excel_sheets(file_name)
+ice_data <- read_excel(file_name, sheet = "data")
 ```
 
 Now, look at a preview of the data using the `head()` function. The `doy` in `ice_off_doy` stands for "day of the year" and is the day within the year where ice off occurred (January 1 = doy 1).  `did_not_freeze` is a column where 1 = did not freeze and 0 = did freeze.
 
 ```{r}
+
+head(ice_data)
+dim(ice_data)
 
 ```
 
@@ -42,6 +46,10 @@ There should be four columns and \~2703 rows.
 We will practice key skills in the module using a focal lake. Use the `filter` function to filter the more extensive data to only contain the data from Lake Sunapee, a lake in New Hampshire. Filter the data `ice_data` by the variable `lake_name` to create a data frame called `sunapee`.
 
 ```{r}
+library(dplyr)
+
+sunapee <- ice_data |>
+  filter(lake_name == "Sunapee")
 
 ```
 
@@ -58,6 +66,13 @@ Be sure that the title, x-axis, and y-axis labels are clearly labeled.
 **Answer 1:**
 
 ```{r}
+library(ggplot2)
+
+ggplot(sunapee, aes(x = year, y = ice_off_doy)) +
+  geom_line() +
+  geom_point() +
+  labs(x = "Year", y = "Ice-Off Day of the Year", title = "Lake Sunapee Ice-Off Over Time") +
+  theme_classic()
 
 ```
 
@@ -70,6 +85,8 @@ We want to model how the ice-off date changes over time. Our approach in this mo
 What do you expect the sign (plus, minus, or no change) to be for the slope of the relationship? Why?
 
 **Answer 2:**
+I expect the sign to be a minus because over time, there will be less ice on the lake due to climate change. 
+
 
 Use the `lm` function to predict `ice_off_doy` as a function (`~`) of the year for the data.frame called `sunapee`. You can learn more about the `lm` function [here](https://www.datacamp.com/tutorial/linear-regression-R)
 
@@ -77,11 +94,15 @@ Create an object called `fit` that contains the results of the linear model.
 
 ```{r}
 
+fit <- lm(ice_off_doy ~ year, data = sunapee)
+
 ```
 
 Then, use the function `summary` to explore the result of the `lm` function.
 
 ```{r}
+
+summary(fit)
 
 ```
 
@@ -97,6 +118,7 @@ fit$coefficients[2]
 What is the direction of the slope? How does this match your expectations from Question 2?
 
 **Answer 3:**
+The direction of the slope is negative. This matches my expectations from Question 2 since I predicted the sign to be a minus. 
 
 # Is our model any good?
 
@@ -109,6 +131,8 @@ First, it is important to understand how much variation is explained by the mode
 What is the R2 for the regression? Based on the R2, is `year` and `ice_off_doy` strongly related?
 
 **Answer 4:**
+The R2 is 0.2055. Based on this, year and ice_off_doy is not strongly related as the R2 is closer to 0 than 1.
+
 
 ## Residuals normally distributed
 
@@ -128,6 +152,8 @@ We will use a histogram to visually assess whether this requirement is met. Firs
 You will use a histogram to examine the residuals. First, the code uses the coefficients to predict the yearly ice-off DOY. Second, calculate the residuals by subtracting the predicted ice-off DOY from the observed DOY.
 
 ```{r}
+sunapee$ice_off_doy <- as.numeric(sunapee$ice_off_doy)
+
 sunapee <- sunapee %>% 
   mutate(predicted = fit$coefficients[1] + year * fit$coefficients[2], 
          residual = ice_off_doy - predicted) #Observed - Predicted
@@ -141,6 +167,12 @@ Use the [`add_predictions()`](https://modelr.tidyverse.org/reference/add_predict
 
 ```{r}
 
+library(modelr)
+
+sunapee <- sunapee |>
+  add_predictions(fit, var = "predicted") |>
+  add_residuals(fit, var = "residual")
+
 ```
 
 Now, to visualize the residuals, use `geom_histogram()` to plot them as a histogram. I recommend using a bin width of 10 in the histogram.
@@ -152,6 +184,11 @@ Show Histogram and answer the following question: do the residuals meet the assu
 **Answer 6:**
 
 ```{r}
+
+ggplot(sunapee) +
+  geom_histogram(aes(x = residual), bins = 20) +
+  labs(x = "Residuals", y = "Count", title = "Histogram of Residuals") +
+  theme_classic()
 
 ```
 
@@ -165,6 +202,8 @@ A slope could appear to be higher or lower than zero, but the uncertainty in the
 Based on the `summary()` above, what is the p-value for the slope?
 
 **Answer 7:**
+The p-value for the slope is 2.5e-09.
+
 
 ## The slope physically meaningful
 
@@ -175,6 +214,8 @@ A slope value could have a low probability of being 0 (thus we have a strong bel
 Based on the slope value, how many more years are needed to pass before the lake has a 1 week change in ice off doy? Do you think this is meaningful? Why?
 
 **Answer 8:**
+The estimated slope for the year is -0.10602 days/year. So, Y (years needed) = 7 / 0.10602 where Y = 66.03. It will take ~66 years. I think this is meaningful because the ice-off is already increasing at high rates and within 66 years, it will only take 1 week for changes to be seen. This could indicate that in the future, ice-off changes will be extremely dramatic.
+
 
 ## Overall model assessment
 
@@ -183,12 +224,20 @@ Based on the slope value, how many more years are needed to pass before the lake
 How comfortable are you proceeding with using this linear model for additional analysis and prediction? Why? (I am not looking for your gut answer, rather I want you to apply concepts taught in this module to justify your answer)
 
 **Answer 9:**
+I am somewhat comfortable with using this linear model for additional analysis and prediction. I feel that I am able to interpret histograms confidently, but lack the confidence in analyzing the summaries of linear models and its regressions/fits.
+
 
 **Question 10:**
 Now plot the data for Lake Sunapee (just like above - year on x-axis vs. ice of doy on y axis) but add the line from your regression results (e.g., fit intercept and slope). You will use the [`geom_abline`](https://ggplot2.tidyverse.org/reference/geom_abline.html). 
 
 **Answer 10:**
 ```{r}
+
+ggplot(sunapee, aes(x = year, y = ice_off_doy)) +
+  geom_point() +
+  geom_abline(intercept = fit$coefficients[1], slope = fit$coefficients[2], color = "purple") +
+  labs(x = "Year", y = "Ice-Off Day of the Year", title = "Lake Sunapee Ice-Off Over Time") +
+  theme_classic()
 
 ```
 
@@ -205,6 +254,19 @@ The goal of this question is to make a forecast of the future ice-off day (with 
 
 ```{r}
 
+pred_2040 <- fit$coefficients[1] + fit$coefficients[2] * 2040
+pred_2040
+
+resid_quantiles <- quantile(sunapee$residual, probs = c(0.05, 0.95))
+resid_quantiles
+
+lower_interval <- pred_2040 + resid_quantiles[1]
+upper_interval <- pred_2040 + resid_quantiles[2]
+c(lower = lower_interval, upper = upper_interval)
+
+width <- upper_interval - lower_interval
+width
+
 ```
 
 # Is the ice-off day of the year changing more quickly in more recent years at Lake Sunapee?
@@ -216,6 +278,26 @@ To answer this question, you need to divide the Sunapee dataset into two dataset
 Use the skills developed above to evaluate the question "Is the ice-off day of year changing more quickly in more recent years at Lake Sunapee?"
 
 **Answer 12:**
+Based on the graph and slope fits below, the ice-off day of year is changing more quickly since the later fit (red) declines more rapidly than the early fit (blue).
+
+```{r}
+sunapee_early <- sunapee |>
+  filter(year < 1970)
+
+sunapee_later <- sunapee |>
+  filter(year >= 1970)
+
+fit_early <- lm(ice_off_doy ~ year, data = sunapee_early)
+fit_later <- lm(ice_off_doy ~ year, data = sunapee_later)
+
+ggplot(sunapee, aes(x = year, y = ice_off_doy)) +
+  geom_point() +
+  geom_abline(intercept = fit_early$coefficients[1], slope = fit_early$coefficients[2], color = "blue") +
+  geom_abline(intercept = fit_later$coefficients[1], slope = fit_later$coefficients[2], color = "red") +
+  labs(x = "Year", y = "Ice-Off Day of the Year", title = "Lake Sunapee Ice-Off Before and After 1970") +
+  theme_classic()
+
+```
 
 Use a mix of code, figures, and text to present your analysis.  If you want to compare slopes, be sure they are on the same plot.
 
